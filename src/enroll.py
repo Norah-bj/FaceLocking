@@ -32,6 +32,7 @@ Controls:
 
 from __future__ import annotations
 
+import argparse
 import json
 import time
 
@@ -284,6 +285,14 @@ def draw_status(
 
 def main():
 
+    parser = argparse.ArgumentParser(
+        description="Enroll a face using the selected camera."
+    )
+    parser.add_argument("--camera", type=int, default=0)
+    parser.add_argument("--width", type=int, default=640)
+    parser.add_argument("--height", type=int, default=480)
+    args = parser.parse_args()
+
     cfg = EnrollConfig()
 
     ensure_dirs(cfg)
@@ -346,16 +355,16 @@ def main():
     last_auto = 0.0
 
     cap = cv2.VideoCapture(
-        0,
+        args.camera,
         cv2.CAP_DSHOW,
     )
 
     if not cap.isOpened():
         cap.release()
-        cap = cv2.VideoCapture(0)
+        cap = cv2.VideoCapture(args.camera)
 
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, args.width)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, args.height)
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
     if not cap.isOpened():
