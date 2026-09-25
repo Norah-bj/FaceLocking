@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+models/*.onnx
+*.zip
+data/db/*
+data/enroll/*
+data/debug_aligned/*
