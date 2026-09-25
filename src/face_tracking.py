@@ -66,7 +66,7 @@ class TrackingSignal:
 class LockedFaceTracker:
     def __init__(
         self,
-        target_name: str,
+        target_name: Optional[str],
         detector,
         embedder,
         matcher,
@@ -76,6 +76,7 @@ class LockedFaceTracker:
         dead_zone: float = 0.08,
     ):
         self.target_name = target_name
+        self.auto_select = target_name is None
         self.detector = detector
         self.embedder = embedder
         self.matcher = matcher
@@ -111,19 +112,21 @@ class LockedFaceTracker:
     def box(face):
         return (face.x1, face.y1, face.x2, face.y2)
 
+    def face_embedding(self, frame, face) -> np.ndarray:
+        aligned, _ = align_face_5pt(
+            frame,
+            face.kps,
+            out_size=(112, 112),
+        )
+        return self.embedder.embed(aligned).reshape(-1)
+
     def similarity_to_target(self, frame, face) -> float:
         template = self.matcher.db.get(self.target_name)
 
         if template is None:
             return 0.0
 
-        aligned, _ = align_face_5pt(
-            frame,
-            face.kps,
-            out_size=(112, 112),
-        )
-
-        emb = self.embedder.embed(aligned).reshape(-1)
+        emb = self.face_embedding(frame, face)
         ref = np.asarray(template, dtype=np.float32).reshape(-1)
 
         return float(np.dot(emb, ref))
@@ -131,17 +134,32 @@ class LockedFaceTracker:
     def acquire(self, frame, faces):
         best = None
         best_similarity = self.acquire_sim
+        best_name = self.target_name
 
         for face in faces:
             # Approximate boxes are for holding a lock, not starting one.
             if face.score < 1.0:
                 continue
 
-            similarity = self.similarity_to_target(frame, face)
+            if self.auto_select and self.target_name is None:
+                match = self.matcher.match(
+                    self.face_embedding(frame, face)
+                )
+                if not match.accepted:
+                    continue
+                name = match.name
+                similarity = match.similarity
+            else:
+                name = self.target_name
+                similarity = self.similarity_to_target(frame, face)
 
-            if similarity > best_similarity:
+            if name is not None and similarity > best_similarity:
                 best = face
                 best_similarity = similarity
+                best_name = name
+
+        if best is not None and self.auto_select:
+            self.target_name = best_name
 
         return best
 
@@ -232,6 +250,8 @@ class LockedFaceTracker:
 
     def _drop_lock(self):
         self.state = LockState.SEARCHING
+        if self.auto_select:
+            self.target_name = None
         self.last_box = None
         self.last_face = None
         self.smooth_box = None
@@ -394,8 +414,8 @@ def main():
 
     parser.add_argument(
         "--target",
-        required=True,
-        help="enrolled identity to lock",
+        default=None,
+        help="optional enrolled identity; omit to lock any recognized person",
     )
 
     parser.add_argument(
@@ -437,6 +457,10 @@ def main():
         load_db_npz(Path("data/db/face_db.npz")),
         dist_thresh=args.threshold,
     )
+    if not matcher.db:
+        raise RuntimeError(
+            "The face database is empty. Run `python -m src.enroll` first."
+        )
 
     tracker = LockedFaceTracker(
         args.target,
@@ -466,11 +490,12 @@ def main():
             locked_face, position = tracker.update(frame)
 
             view = frame.copy()
+            locked_name = tracker.target_name or "ANY KNOWN PERSON"
 
             state_text = (
-                f"FACE MISSING - REACQUIRING: {args.target}"
+                f"FACE MISSING - REACQUIRING: {locked_name}"
                 if tracker.state == LockState.LOST
-                else f"{tracker.state.name}: {args.target}"
+                else f"{tracker.state.name}: {locked_name}"
             )
 
             state_color = (0, 0, 255) if tracker.state == LockState.LOST else (
