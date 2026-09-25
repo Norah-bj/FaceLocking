@@ -18,6 +18,8 @@ import numpy as np
 import mediapipe as mp
 import os
 
+from .camera_utils import open_camera
+
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
@@ -80,7 +82,7 @@ def main():
         min_tracking_confidence=0.5,
     )
 
-    cap = cv2.VideoCapture(1)
+    cap = open_camera()
 
     if not cap.isOpened():
         raise RuntimeError(

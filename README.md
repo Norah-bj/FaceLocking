@@ -28,7 +28,14 @@ Run commands from the repository root. Press `q` to close camera previews.
 python -m src.camera
 ```
 
-The camera-based scripts now use external camera index `1` by default. If Windows assigns your external camera a different index, use `--camera 0` or `--camera 2` in scripts that accept that option, or change the default in that script.
+Camera indexes are assigned by Windows and do not reliably distinguish a PC camera from an external camera. Find which preview is the external camera, then set its index once for all project scripts:
+
+```powershell
+python -m src.camera --scan
+$env:FACELOCKING_CAMERA_INDEX = "N"
+```
+
+The scan previews indexes one at a time. Press **n** to move to the next index and **q** to quit after identifying the external camera. Replace `N` with the number shown in that preview. This setting applies to all camera scripts in the current PowerShell window.
 
 ### 2. Check face detection
 
@@ -41,7 +48,7 @@ The preview should draw a box around a face. If it cannot open the camera, close
 ### 3. Enroll your identity
 
 ```powershell
-python -m src.enroll --camera 1
+python -m src.enroll
 ```
 
 Enter your identity name in the PowerShell prompt. Keep your face well lit and centered. Capture at least 15 varied, sharp samples, looking straight ahead and slightly changing your pose. Use **SPACE** for one capture or **a** to toggle automatic capture, then press **s** to save. Press **q** to quit. The tool writes the local database to `data/db/face_db.npz` and `data/db/face_db.json`; aligned captures are saved under `data/enroll/<name>/`.
@@ -79,10 +86,10 @@ The enrolled identity should be labeled when recognized; people without a matchi
 Use the exact identity name used during enrollment:
 
 ```powershell
-python -m src.face_tracking --target "Nora" --camera 1 --width 1280 --height 720
+python -m src.face_tracking --target "Nora" --width 1280 --height 720
 ```
 
-Use camera index `1` for enrollment and tracking. For example, `python -m src.enroll --camera 1 --width 1280 --height 720`. If your external camera is assigned another index, pass that index to `--camera`. The tracking overlay should lock the selected identity, mark other detected faces as ignored, display blink and expression cues, and show the nose tip's direction and pixel distance from frame center. Change `--lost-timeout 2.0` to set how long it keeps the target lock during a brief disappearance.
+Enrollment and tracking use `FACELOCKING_CAMERA_INDEX` automatically. You can override it for an individual run with `--camera N`, for example `python -m src.enroll --camera 2 --width 1280 --height 720`. The tracking overlay should lock the selected identity, mark other detected faces as ignored, display blink and expression cues, and show the nose tip's direction and pixel distance from frame center. Change `--lost-timeout 2.0` to set how long it keeps the target lock during a brief disappearance.
 
 The expression overlay asks you to hold a neutral face briefly while it learns your baseline. Then try a smile, a clear frown, a sad expression with raised inner brows and downturned mouth corners, and a tight grimace one at a time. Hold each for a second so the smoothed signal can respond. Labels combine MediaPipe blendshape scores with face-landmark geometry; they are approximate cues and depend on lighting, camera angle, and face visibility. The reported nose distance is in image pixels, not physical units. The camera driver may ignore requested resolutions; verify the actual preview size before presenting an HD-camera test.
 

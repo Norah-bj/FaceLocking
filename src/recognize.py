@@ -44,6 +44,7 @@ from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
 from .haar_5pt import align_face_5pt
+from .camera_utils import open_camera
 
 
 # -------------------------
@@ -807,7 +808,7 @@ def main():
         dist_thresh=0.34,
     )
 
-    cap = cv2.VideoCapture(1)
+    cap = open_camera()
 
     if not cap.isOpened():
         raise RuntimeError(

@@ -24,6 +24,8 @@ import cv2
 import numpy as np
 import mediapipe as mp
 
+from .camera_utils import open_camera
+
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
@@ -725,7 +727,7 @@ class Haar5ptDetector:
 
 def main():
 
-    cap = cv2.VideoCapture(1)
+    cap = open_camera()
 
     det = Haar5ptDetector(
         min_size=(70, 70),

@@ -30,6 +30,8 @@ from typing import Tuple
 import cv2
 import numpy as np
 
+from .camera_utils import default_camera_index, open_camera
+
 # Import from your existing script
 from .haar_5pt import Haar5ptDetector, align_face_5pt
 
@@ -67,24 +69,13 @@ def _safe_imshow(
 
 
 def main(
-    cam_index: int = 1,
+    cam_index: int | None = None,
     out_size: Tuple[int, int] = (112, 112),
     mirror: bool = True,
 ):
 
-    cap = cv2.VideoCapture(
-        cam_index,
-        cv2.CAP_DSHOW,
-    )
-
-    if not cap.isOpened():
-        cap.release()
-        cap = cv2.VideoCapture(cam_index)
-
-    # Smaller capture = less camera lag on Windows.
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+    cam_index = default_camera_index() if cam_index is None else cam_index
+    cap = open_camera(cam_index, width=640, height=480)
 
     det = Haar5ptDetector(
         min_size=(70, 70),

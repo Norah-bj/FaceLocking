@@ -45,6 +45,7 @@ import numpy as np
 
 from .haar_5pt import Haar5ptDetector, align_face_5pt
 from .embed import ArcFaceEmbedderONNX
+from .camera_utils import default_camera_index, open_camera
 
 
 # -------------------------
@@ -288,7 +289,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Enroll a face using the selected camera."
     )
-    parser.add_argument("--camera", type=int, default=1)
+    parser.add_argument("--camera", type=int, default=default_camera_index())
     parser.add_argument("--width", type=int, default=640)
     parser.add_argument("--height", type=int, default=480)
     args = parser.parse_args()
@@ -354,24 +355,11 @@ def main():
     auto = False
     last_auto = 0.0
 
-    cap = cv2.VideoCapture(
+    cap = open_camera(
         args.camera,
-        cv2.CAP_DSHOW,
+        width=args.width,
+        height=args.height,
     )
-
-    if not cap.isOpened():
-        cap.release()
-        cap = cv2.VideoCapture(args.camera)
-
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, args.width)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, args.height)
-    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-
-    if not cap.isOpened():
-
-        raise RuntimeError(
-            "Failed to open camera."
-        )
 
     cv2.namedWindow(
         cfg.window_main,

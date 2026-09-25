@@ -3,6 +3,8 @@
 import cv2
 import os
 
+from .camera_utils import open_camera
+
 
 def main():
     cascade_path = os.path.join(
@@ -18,7 +20,7 @@ def main():
     if face.empty():
         raise RuntimeError(f"Failed to load cascade: {cascade_path}")
 
-    cap = cv2.VideoCapture(1)
+    cap = open_camera()
 
     if not cap.isOpened():
         raise RuntimeError("Camera index 1 not opened. Check that the external camera is connected and not in use.")
