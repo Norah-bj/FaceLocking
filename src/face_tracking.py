@@ -400,8 +400,8 @@ def main():
     parser.add_argument(
         "--camera",
         type=int,
-        default=0,
-        help="camera device index (0 is usually built-in; try 1 for USB camera)",
+        default=1,
+        help="camera device index (1 is the default external camera)",
     )
 
     parser.add_argument("--width", type=int, default=1280)

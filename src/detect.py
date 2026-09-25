@@ -18,10 +18,10 @@ def main():
     if face.empty():
         raise RuntimeError(f"Failed to load cascade: {cascade_path}")
 
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(1)
 
     if not cap.isOpened():
-        raise RuntimeError("Camera not opened. Try camera index 0/1/2.")
+        raise RuntimeError("Camera index 1 not opened. Check that the external camera is connected and not in use.")
 
     print("Haar face detect (minimal). Press 'q' to quit.")
 

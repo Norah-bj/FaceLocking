@@ -807,7 +807,7 @@ def main():
         dist_thresh=0.34,
     )
 
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(1)
 
     if not cap.isOpened():
         raise RuntimeError(

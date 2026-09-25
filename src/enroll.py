@@ -288,7 +288,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Enroll a face using the selected camera."
     )
-    parser.add_argument("--camera", type=int, default=0)
+    parser.add_argument("--camera", type=int, default=1)
     parser.add_argument("--width", type=int, default=640)
     parser.add_argument("--height", type=int, default=480)
     args = parser.parse_args()

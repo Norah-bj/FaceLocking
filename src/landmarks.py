@@ -80,11 +80,11 @@ def main():
         min_tracking_confidence=0.5,
     )
 
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(1)
 
     if not cap.isOpened():
         raise RuntimeError(
-            "Camera not opened. Try camera index 0/1/2."
+            "Camera index 1 not opened. Check that the external camera is connected and not in use."
         )
 
     print(
