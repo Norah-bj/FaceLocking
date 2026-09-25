@@ -107,6 +107,8 @@ class LockedFaceTracker:
         self.verify_fails = 0
         self.frame_index = 0
         self.detected_faces = []
+        self.detected_labels = []
+        self._cached_detection_labels = []
 
     @staticmethod
     def box(face):
@@ -162,6 +164,52 @@ class LockedFaceTracker:
             self.target_name = best_name
 
         return best
+
+    def label_detections(self, frame, faces):
+        """Classify detected faces, rechecking embeddings every few frames."""
+
+        if not faces:
+            self.detected_labels = []
+            self._cached_detection_labels = []
+            return
+
+        refresh = (
+            not self._cached_detection_labels
+            or self.frame_index % self.verify_every == 0
+        )
+
+        if refresh:
+            labeled = []
+            for face in faces:
+                name = "UNKNOWN"
+                if face.score >= 1.0:
+                    result = self.matcher.match(
+                        self.face_embedding(frame, face)
+                    )
+                    if result.accepted and result.name is not None:
+                        name = result.name
+                labeled.append((self.box(face), name))
+            self._cached_detection_labels = labeled
+            self.detected_labels = [name for _box, name in labeled]
+            return
+
+        previous = list(self._cached_detection_labels)
+        labeled = []
+        for face in faces:
+            current_box = self.box(face)
+            name = "UNKNOWN"
+            if previous:
+                best_index = max(
+                    range(len(previous)),
+                    key=lambda i: iou(current_box, previous[i][0]),
+                )
+                overlap = iou(current_box, previous[best_index][0])
+                if overlap >= 0.10:
+                    _old_box, name = previous.pop(best_index)
+            labeled.append((current_box, name))
+
+        self._cached_detection_labels = labeled
+        self.detected_labels = [name for _box, name in labeled]
 
     def associate(self, faces):
         if self.smooth_box is None or not faces:
@@ -271,6 +319,7 @@ class LockedFaceTracker:
             coarse=True,
         )
         self.detected_faces = faces
+        self.label_detections(frame, faces)
 
         if self.state == LockState.SEARCHING:
             candidate = self.acquire(frame, faces)
@@ -636,10 +685,15 @@ def main():
                 if tracker.last_face is not None
                 else None
             )
-            for other in tracker.detected_faces:
+            for index, other in enumerate(tracker.detected_faces):
                 other_box = tracker.box(other)
                 if target_box is not None and iou(target_box, other_box) > 0.25:
                     continue
+                identity = (
+                    tracker.detected_labels[index]
+                    if index < len(tracker.detected_labels)
+                    else "UNKNOWN"
+                )
                 cv2.rectangle(
                     view,
                     (other.x1, other.y1),
@@ -649,9 +703,9 @@ def main():
                 )
                 draw_label(
                     view,
-                    "BACKGROUND FACE - IGNORED",
+                    identity,
                     (other.x1, max(110, other.y1 - 8)),
-                    (180, 180, 180),
+                    (0, 0, 255) if identity == "UNKNOWN" else (180, 180, 180),
                     0.48,
                 )
 
