@@ -519,15 +519,23 @@ def main():
                     if face_state.blink:
                         blink_total += 1
 
-                    expression = "NEUTRAL"
-                    if face_state.smiling:
-                        expression = "SMILE"
-                    elif face_state.grimacing:
-                        expression = "GRIMACE"
-                    elif face_state.sad:
-                        expression = "SAD CUES"
-                    elif face_state.frowning:
-                        expression = "FROWN"
+                    if not signals.expression_ready:
+                        expression = "CALIBRATING - HOLD NEUTRAL"
+                    else:
+                        active_expressions = []
+                        if face_state.smiling:
+                            active_expressions.append("SMILE")
+                        if face_state.frowning:
+                            active_expressions.append("FROWN")
+                        if face_state.sad:
+                            active_expressions.append("SAD CUES")
+                        if face_state.grimacing:
+                            active_expressions.append("GRIMACE")
+                        expression = (
+                            " + ".join(active_expressions)
+                            if active_expressions
+                            else "NEUTRAL"
+                        )
 
                     eye_text = (
                         "EYES CLOSED"
@@ -539,7 +547,9 @@ def main():
                         view,
                         expression,
                         (x1, max(55, y1 - 50)),
-                        (0, 255, 255),
+                        (0, 170, 255)
+                        if not signals.expression_ready
+                        else (0, 255, 255),
                     )
 
                     draw_label(

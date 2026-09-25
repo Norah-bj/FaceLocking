@@ -19,6 +19,8 @@ MOUTH_LEFT, MOUTH_RIGHT = 61, 291
 LIP_TOP, LIP_BOTTOM = 13, 14
 
 FACE_LEFT, FACE_RIGHT = 234, 454
+BROW_INNER_LEFT, BROW_INNER_RIGHT = 107, 336
+EYE_INNER_LEFT, EYE_INNER_RIGHT = 133, 362
 
 
 def distance(a: np.ndarray, b: np.ndarray) -> float:
@@ -81,6 +83,13 @@ class FaceSignalExtractor:
         self.mouth_hist: deque = deque(maxlen=5)
         self.lift_hist: deque = deque(maxlen=5)
         self.expression_hist: deque = deque(maxlen=3)
+        self.expression_lift_samples: deque = deque(maxlen=20)
+        self.expression_mouth_samples: deque = deque(maxlen=20)
+        self.expression_brow_samples: deque = deque(maxlen=20)
+        self.expression_lift_baseline: Optional[float] = None
+        self.expression_mouth_baseline: Optional[float] = None
+        self.expression_brow_baseline: Optional[float] = None
+        self.expression_ready = False
 
         model_path = (
             Path(__file__).resolve().parent.parent
@@ -125,6 +134,13 @@ class FaceSignalExtractor:
         self.mouth_hist.clear()
         self.lift_hist.clear()
         self.expression_hist.clear()
+        self.expression_lift_samples.clear()
+        self.expression_mouth_samples.clear()
+        self.expression_brow_samples.clear()
+        self.expression_lift_baseline = None
+        self.expression_mouth_baseline = None
+        self.expression_brow_baseline = None
+        self.expression_ready = False
 
     def close(self) -> None:
         self.landmarker.close()
@@ -133,8 +149,8 @@ class FaceSignalExtractor:
         self,
         frame: np.ndarray,
         bbox,
-    ) -> Optional[Tuple[float, float, float, float]]:
-        """Return left EAR, right EAR, mouth-width ratio, corner lift."""
+    ) -> Optional[Tuple[float, float, float, float, float]]:
+        """Return eye ratios, mouth ratio, corner lift, inner-brow lift."""
 
         height, width = frame.shape[:2]
         x1, y1, x2, y2 = bbox
@@ -224,7 +240,18 @@ class FaceSignalExtractor:
         corner_y = 0.5 * (float(left_corner[1]) + float(right_corner[1]))
         corner_lift = (opening_y - corner_y) / mouth_width
 
-        return left_ear, right_ear, mouth_ratio, corner_lift
+        # Measure how far the inner brows sit above the inner eye corners.
+        # This gives a geometry-based sadness cue when blendshapes are weak.
+        eye_width = max(
+            distance(points[EYE_INNER_LEFT], points[EYE_INNER_RIGHT]),
+            1e-6,
+        )
+        brow_lift = (
+            (points[EYE_INNER_LEFT, 1] - points[BROW_INNER_LEFT, 1])
+            + (points[EYE_INNER_RIGHT, 1] - points[BROW_INNER_RIGHT, 1])
+        ) / (2.0 * eye_width)
+
+        return left_ear, right_ear, mouth_ratio, corner_lift, float(brow_lift)
 
     def _update_smile(
         self,
@@ -318,7 +345,7 @@ class FaceSignalExtractor:
             return None
 
         self.measure_miss = 0
-        left_ear, right_ear, mouth_ratio, corner_lift = measured
+        left_ear, right_ear, mouth_ratio, corner_lift, brow_lift = measured
 
         self.left_ear_hist.append(left_ear)
         self.right_ear_hist.append(right_ear)
@@ -357,6 +384,22 @@ class FaceSignalExtractor:
         mouth_ratio = float(np.median(self.mouth_hist))
         corner_lift = float(np.median(self.lift_hist))
 
+        if not self.expression_ready:
+            self.expression_lift_samples.append(corner_lift)
+            self.expression_mouth_samples.append(mouth_ratio)
+            self.expression_brow_samples.append(brow_lift)
+            if len(self.expression_lift_samples) == 20:
+                self.expression_lift_baseline = float(
+                    np.median(self.expression_lift_samples)
+                )
+                self.expression_mouth_baseline = float(
+                    np.median(self.expression_mouth_samples)
+                )
+                self.expression_brow_baseline = float(
+                    np.median(self.expression_brow_samples)
+                )
+                self.expression_ready = True
+
         smile_score = self._update_smile(mouth_ratio, corner_lift)
 
         blendshapes = {}
@@ -385,13 +428,38 @@ class FaceSignalExtractor:
             blendshapes.get("mouthStretchLeft", 0.0),
             blendshapes.get("mouthStretchRight", 0.0),
         )
-        self.expression_hist.append(
-            (
-                mouth_frown >= 0.35,
-                mouth_frown >= 0.25 and brow_inner >= 0.30,
-                mouth_press >= 0.42 or mouth_stretch >= 0.48,
+        downturn = 0.0
+        brow_raise = 0.0
+        if self.expression_lift_baseline is not None:
+            downturn = self.expression_lift_baseline - corner_lift
+        if self.expression_brow_baseline is not None:
+            brow_raise = brow_lift - self.expression_brow_baseline
+
+        frown_cue = (
+            mouth_frown >= 0.16
+            or (self.expression_ready and downturn >= 0.025)
+        )
+        sad_cue = (
+            (brow_inner >= 0.16 or brow_raise >= 0.012)
+            and (
+                mouth_frown >= 0.12
+                or (self.expression_ready and downturn >= 0.018)
             )
         )
+        grimace_cue = (
+            mouth_press >= 0.18
+            or (
+                mouth_stretch >= 0.32
+                and not self.smiling
+                and (mouth_frown >= 0.10 or downturn >= 0.015)
+            )
+        )
+
+        if self.expression_ready:
+            self.expression_hist.append(
+                (frown_cue, sad_cue, grimace_cue)
+            )
+
         frowning = sum(item[0] for item in self.expression_hist) >= 2
         sad = sum(item[1] for item in self.expression_hist) >= 2
         grimacing = sum(item[2] for item in self.expression_hist) >= 2

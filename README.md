@@ -84,7 +84,7 @@ python -m src.face_tracking --target "Nora" --camera 0 --width 1280 --height 720
 
 Use the same `--camera` option when enrolling, for example `python -m src.enroll --camera 1 --width 1280 --height 720`. For an external HD camera, try index `1`; if it is a different device index, try `0`, `1`, or `2`. The tracking overlay should lock the selected identity, mark other detected faces as ignored, display blink and expression cues, and show the nose tip's direction and pixel distance from frame center. Change `--lost-timeout 2.0` to set how long it keeps the target lock during a brief disappearance.
 
-The reported nose distance is in image pixels, not physical units. Frown, sadness, and grimace labels are approximate blendshape cues and need live testing under steady lighting. The camera driver may ignore requested resolutions; verify the actual preview size before presenting an HD-camera test.
+The expression overlay asks you to hold a neutral face briefly while it learns your baseline. Then try a smile, a clear frown, a sad expression with raised inner brows and downturned mouth corners, and a tight grimace one at a time. Hold each for a second so the smoothed signal can respond. Labels combine MediaPipe blendshape scores with face-landmark geometry; they are approximate cues and depend on lighting, camera angle, and face visibility. The reported nose distance is in image pixels, not physical units. The camera driver may ignore requested resolutions; verify the actual preview size before presenting an HD-camera test.
 
 ## Privacy and repository contents
 
